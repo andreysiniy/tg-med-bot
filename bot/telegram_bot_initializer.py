@@ -6,6 +6,7 @@ import logging
 import db.mongodb_service as db
 from helpers.configurator import Config
 from llmservices.google_service import GoogleService
+from clients.backend_api_client import BackendApiClient
 
 # Configure logging
 db = db.Database()
@@ -42,8 +43,10 @@ class TelegramBotInitializer:
                 .build()
             )
             application.add_handler(CommandHandler("start", self.start_command))
+            application.add_handler(CommandHandler("gettest", self.gettest_command))
             application.add_handler(MessageHandler(filters.TEXT, self.default_response))
             
+
             application.run_polling()
             logger.info("Telegram bot initialized successfully.")
             
@@ -101,3 +104,17 @@ class TelegramBotInitializer:
             parse_mode=ParseMode.HTML
         )
 
+    async def gettest_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handles the /test command.
+
+        Args:
+            update (Update): The update containing the message from the user.
+            context (ContextTypes.DEFAULT_TYPE): The context of the command.
+        """
+        response = await BackendApiClient().get("ClinicCards/1", params={"":""})
+        logger.info(f"Response from Backend API: {response}")
+        await update.message.reply_text(
+            f"Test command received. GET: {response}",
+            parse_mode=ParseMode.HTML
+        )
