@@ -3,13 +3,14 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardR
 from telegram.ext import ContextTypes, ConversationHandler
 from clients.backend_api_client import BackendApiClient
 from datetime import date, timedelta, datetime
+import db.mongodb_service as db
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-
-class StepHandler:
+db = db.Database()
+class CreateStepHandler:
     """
     Handles button interactions in the Telegram bot.
     This class provides methods to create and manage buttons for user interactions.
@@ -406,13 +407,30 @@ class StepHandler:
         choice = update.message.text
         
         if choice == "Подтвердить":
-            # Логика реального создания записи через BackendApiClient()
-            # success = await BackendApiClient().create_appointment(context.user_data["create_appointment_data"])
-            # if success:
-            #    await update.effective_message.reply_text("Вы успешно записаны!", reply_markup=ReplyKeyboardRemove())
-            # else:
-            #    await update.effective_message.reply_text("Не удалось создать запись. Попробуйте позже.", reply_markup=ReplyKeyboardRemove())
-            await update.effective_message.reply_text("Вы успешно записаны (демо-режим)!", reply_markup=ReplyKeyboardRemove())
+            request_body = {
+                "patientName" : db.get_user_fullname(update.effective_user.id),
+                "patientUuid" : db.get_user_uuid(update.effective_user.id),
+                "phone" : "+7(999)999-99-99",
+                "appointmentTime" : context.user_data["create_appointment_data"]["appointment_datetime_iso"],
+                "doctorId" : context.user_data["create_appointment_data"]["doctor_id"]
+            }
+            response = await BackendApiClient().post_appointment(request_body)
+            if response:
+                await update.effective_message.reply_text("Вы успешно записаны!", reply_markup=ReplyKeyboardRemove())
+                appointment_time_str = response['appointmentTime']
+                dt_object = datetime.fromisoformat(appointment_time_str)
+                formatted_time = dt_object.strftime("%d.%m %H:%M")
+                text = (
+                    "Данные записи:\n"
+                    f"Пациент: <b>{response['patientName']}</b>\n"
+                    f"Клиника: <b>{response['clinicName']}</b>\n"
+                    f"Специальность: <b>{response['doctorSpeciality']}</b>\n"
+                    f"Врач: <b>{response['doctorName']}</b>\n"
+                    f"Дата и время: <b>{formatted_time}</b>"
+                )
+                await update.effective_message.reply_text(text, parse_mode='HTML')
+            else:
+                await update.effective_message.reply_text("Не удалось создать запись. Попробуйте позже.", reply_markup=ReplyKeyboardRemove())
             context.user_data.clear()
             return ConversationHandler.END
         

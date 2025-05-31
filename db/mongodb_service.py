@@ -46,3 +46,31 @@ class Database:
         }
         if not self.check_if_user_exists(user_id):
             self.user_collection.insert_one(user_dict)
+
+    def get_user_uuid(self, user_id: int) -> Optional[str]:
+        """
+        Retrieves the UUID of a user by their user ID.
+
+        Args:
+            user_id (int): The ID of the user.
+
+        Returns:
+            Optional[str]: The UUID of the user if found, None otherwise.
+        """
+        user = self.user_collection.find_one({"user_id": user_id}, {"user_uuid": 1})
+        return user["user_uuid"] if user else None
+    
+    def get_user_fullname(self, user_id: int) -> Optional[str]:
+        """
+        Retrieves the username of a user by their user ID.
+
+        Args:
+            user_id (int): The ID of the user.
+
+        Returns:
+            Optional[str]: The username of the user if found, None otherwise.
+        """
+        user_firstname = self.user_collection.find_one({"user_id": user_id}, {"first_name": 1})
+        user_lastname = self.user_collection.find_one({"user_id": user_id}, {"last_name": 1})
+        user = user_firstname.get("first_name", "") +  ' ' + user_lastname.get("last_name", "")
+        return user if user else None

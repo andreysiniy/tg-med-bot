@@ -7,7 +7,7 @@ import db.mongodb_service as db
 from helpers.configurator import Config
 from llmservices.google_service import GoogleService
 from clients.backend_api_client import BackendApiClient
-from handlers.step_handler import StepHandler
+from handlers.create_step_handler import CreateStepHandler
 
 # Configure logging
 db = db.Database()
@@ -25,7 +25,7 @@ class TelegramBotInitializer:
         Args:
             token (str): The bot token provided by BotFather.
         """
-        self.step_handler_instance = StepHandler()
+        self.step_handler_instance = CreateStepHandler()
         self.conv_handler: ConversationHandler | None = None
         self.bot = self.initialize_telegram_bot()
         
@@ -54,12 +54,12 @@ class TelegramBotInitializer:
                           MessageHandler(filters.TEXT & ~filters.COMMAND, self.default_response)
                           ],
             states={
-                StepHandler.CHOOSE_CLINIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_clinic_choice)],
-                StepHandler.CHOOSE_SPECIALIZATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_specialization_choice)],
-                StepHandler.CHOOSE_DOCTOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_doctor_choice)],
-                StepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
-                StepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_time_choice)],
-                StepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_confirmation)],
+                CreateStepHandler.CHOOSE_CLINIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_clinic_choice)],
+                CreateStepHandler.CHOOSE_SPECIALIZATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_specialization_choice)],
+                CreateStepHandler.CHOOSE_DOCTOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_doctor_choice)],
+                CreateStepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
+                CreateStepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_time_choice)],
+                CreateStepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_confirmation)],
             },
             fallbacks=[CommandHandler("cancel", self.step_handler_instance.cancel)],
 
@@ -156,7 +156,8 @@ class TelegramBotInitializer:
         """
 
         logger.info(f"handlers: {self.conv_handler.entry_points}")
+        uuid = db.get_user_uuid(update.effective_user.id)
         await update.message.reply_text(
-            f"Test command received. GETTEST",
+            f"Ваш UUID: <b>{uuid}</b>",
             parse_mode=ParseMode.HTML
         )
