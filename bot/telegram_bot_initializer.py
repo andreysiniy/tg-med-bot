@@ -1,7 +1,7 @@
 import telegram
-from telegram import Update, User, BotCommand, Message
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
-from telegram.constants import ParseMode, ChatAction
+from telegram import Update, User, BotCommand
+from telegram.ext import Application, ApplicationBuilder, CallbackContext, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from telegram.constants import ParseMode 
 import logging
 import db.mongodb_service as db
 from helpers.configurator import Config
@@ -17,6 +17,7 @@ class TelegramBotInitializer:
     A class to initialize a Telegram bot with the provided token.
     This class encapsulates the logic for creating a Telegram bot instance.
     """
+
     def __init__(self):
         """
         Initializes the Telegram bot with the provided token.
@@ -24,7 +25,10 @@ class TelegramBotInitializer:
         Args:
             token (str): The bot token provided by BotFather.
         """
+        self.step_handler_instance = StepHandler()
+        self.conv_handler: ConversationHandler | None = None
         self.bot = self.initialize_telegram_bot()
+        
 
     def initialize_telegram_bot(self) -> None:
         """
@@ -37,35 +41,36 @@ class TelegramBotInitializer:
             telegram.Bot: An instance of the Telegram Bot.
         """
         try:
-            application = (
+            self.application = (
                 ApplicationBuilder()
                 .token(Config().get("TELEGRAM", "token"))
                 .http_version("1.1")
                 .build()
             )
-            step_handler_instance = StepHandler()
+            
 
-            conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("new_appointment", step_handler_instance.start_appointment_creation)],
+            self.conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("new_appointment", self.step_handler_instance.start_appointment_creation),
+                          MessageHandler(filters.TEXT & ~filters.COMMAND, self.default_response)
+                          ],
             states={
-                StepHandler.CHOOSE_CLINIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_clinic_choice)],
-                StepHandler.CHOOSE_SPECIALIZATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_specialization_choice)],
-                StepHandler.CHOOSE_DOCTOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_doctor_choice)],
-                StepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
-                StepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_time_choice)],
-                StepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_confirmation)],
+                StepHandler.CHOOSE_CLINIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_clinic_choice)],
+                StepHandler.CHOOSE_SPECIALIZATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_specialization_choice)],
+                StepHandler.CHOOSE_DOCTOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_doctor_choice)],
+                StepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
+                StepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_time_choice)],
+                StepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_confirmation)],
             },
-            fallbacks=[CommandHandler("cancel", step_handler_instance.cancel)],
+            fallbacks=[CommandHandler("cancel", self.step_handler_instance.cancel)],
 
         )
-            application.add_handler(conv_handler)
+            self.application.add_handler(self.conv_handler)
             
-            application.add_handler(CommandHandler("start", self.start_command))
-            application.add_handler(CommandHandler("gettest", self.gettest_command))
-            application.add_handler(MessageHandler(filters.TEXT, self.default_response))
+            self.application.add_handler(CommandHandler("start", self.start_command))
+            self.application.add_handler(CommandHandler("gettest", self.gettest_command))
             
 
-            application.run_polling()
+            self.application.run_polling()
             logger.info("Telegram bot initialized successfully.")
             
         except Exception as e:
@@ -117,6 +122,25 @@ class TelegramBotInitializer:
         """
         reply_msg = await GoogleService().generate_json_text(update.message.text)
         await self.register_user_if_not_exists(update, context)
+        logger.info(f"Received message: {update.message.text}")
+        logger.info(f"Generated reply: {reply_msg}")
+
+        if not reply_msg:
+            await update.message.reply_text(
+                "Извините, я не смог понять ваш запрос. Пожалуйста, попробуйте переформулировать."
+            )
+        
+        if reply_msg.get("intent") == "unknown":
+            await update.message.reply_text(
+                f"Не могу понять ваш запрос: {reply_msg.get('reason', 'Неизвестная ошибка')} Пожалуйста, попробуйте переформулировать."
+            )
+            return
+
+        logger.info(f"handlers: {self.conv_handler.entry_points}")
+        if reply_msg.get("intent") == "book_appointment":
+            return await self.step_handler_instance.start_appointment_creation(update, context)
+
+
         await update.message.reply_text(
             f"Ваш запрос обработан. Ответ: {reply_msg}",
             parse_mode=ParseMode.HTML
@@ -130,9 +154,9 @@ class TelegramBotInitializer:
             update (Update): The update containing the message from the user.
             context (ContextTypes.DEFAULT_TYPE): The context of the command.
         """
-        response = await BackendApiClient().get("ClinicCards/1", params={"":""})
-        logger.info(f"Response from Backend API: {response}")
+
+        logger.info(f"handlers: {self.conv_handler.entry_points}")
         await update.message.reply_text(
-            f"Test command received. GET: {response}",
+            f"Test command received. GETTEST",
             parse_mode=ParseMode.HTML
         )
