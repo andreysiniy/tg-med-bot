@@ -1,12 +1,13 @@
 import telegram
 from telegram import Update, User, BotCommand, Message
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 from telegram.constants import ParseMode, ChatAction
 import logging
 import db.mongodb_service as db
 from helpers.configurator import Config
 from llmservices.google_service import GoogleService
 from clients.backend_api_client import BackendApiClient
+from handlers.step_handler import StepHandler
 
 # Configure logging
 db = db.Database()
@@ -42,6 +43,23 @@ class TelegramBotInitializer:
                 .http_version("1.1")
                 .build()
             )
+            step_handler_instance = StepHandler()
+
+            conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("new_appointment", step_handler_instance.start_appointment_creation)],
+            states={
+                StepHandler.CHOOSE_CLINIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_clinic_choice)],
+                StepHandler.CHOOSE_SPECIALIZATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_specialization_choice)],
+                StepHandler.CHOOSE_DOCTOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_doctor_choice)],
+                StepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
+                StepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_time_choice)],
+                StepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, step_handler_instance.process_confirmation)],
+            },
+            fallbacks=[CommandHandler("cancel", step_handler_instance.cancel)],
+
+        )
+            application.add_handler(conv_handler)
+            
             application.add_handler(CommandHandler("start", self.start_command))
             application.add_handler(CommandHandler("gettest", self.gettest_command))
             application.add_handler(MessageHandler(filters.TEXT, self.default_response))

@@ -1,5 +1,10 @@
 from aiohttp import ClientSession
 import datetime
+from typing import Optional
+from typing import List, Dict, Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BackendApiClient:
     def __init__(self):
@@ -94,7 +99,14 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the doctor's working hours.
         """
-        return await self.get(f"DoctorCards/{doctor_id}/timeslots/{date.strftime("%Y-%m-%d")}")
+        api_response = await self.get(f"DoctorCards/{doctor_id}/timeslots/{date}")
+        if isinstance(api_response, list):
+            formatted_hours = [
+                time_str[:5]
+                for time_str in api_response 
+                if isinstance(time_str, str) and len(time_str) >= 5
+            ]
+        return formatted_hours
     
     async def get_doctor_containting_name(self, name: str) -> dict:
         """
@@ -156,3 +168,102 @@ class BackendApiClient:
         """
         return await self.post("Appointment", data)
     
+    async def get_specific_doctors(
+        self,
+        clinic_id: Optional[int] = None,
+        specialization: Optional[str] = None,
+        name: Optional[str] = None,
+        date: datetime = None
+    ) -> dict:
+        """
+        Retrieves specific doctors by clinic ID and specialization.
+
+        Args:
+            clinic_id (int): The ID of the clinic.
+            specialization (str): The specialization to filter doctors by.
+            name (str): The name to filter doctors by.
+            date (datetime): The date for which to filter doctors by their availability.
+        If no parameters are provided, it retrieves all doctors.
+
+        Returns:
+            dict: The JSON response containing the specific doctors.
+        """
+        base_url = "DoctorCards"
+        query_params = {}
+        if clinic_id:
+            query_params["clinicId"] = clinic_id
+        if specialization:
+            query_params["speciality"] = specialization
+        if name:
+            query_params["name"] = name
+        if date:
+            query_params["appointmentDate"] = date.strftime('%Y-%m-%dT%H:%M')
+        query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
+        if query_string:
+            return await self.get(f"{base_url}?{query_string}")
+        else:
+            return await self.get(base_url)
+       
+    async def get_clinic_by_name(self, name: str) -> dict:
+        """
+        Retrieves a clinic by its name.
+        Args:
+            name (str): The name of the clinic to retrieve.
+        Returns:
+            dict: The JSON response containing the clinic details.
+        """
+        return await self.get(f"ClinicCards/name/{name}")
+    
+    async def get_specializations(
+        self,
+        clinic_id: Optional[int] = None,
+        specialization: Optional[str] = None,
+        name: Optional[str] = None,
+        date: datetime = None
+    ) -> dict:
+        """
+        Retrieves specializations by clinic ID and specialization.
+
+        Args:
+            clinic_id (int): The ID of the clinic.
+            specialization (str): The specialization to filter by.
+            name (str): The name to filter by.
+            date (datetime): The date for which to filter specializations.
+
+        Returns:
+            dict: The JSON response containing the specializations.
+        """
+        base_url = "DoctorCards/speciality"
+        query_params = {}
+        if clinic_id:
+            query_params["clinicId"] = clinic_id
+        if specialization:
+            query_params["speciality"] = specialization
+        if name:
+            query_params["name"] = name
+        if date:
+            query_params["appointmentDate"] = date.strftime('%Y-%m-%dT%H:%M')
+        query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
+        
+        
+        if query_string:
+            api_response_list = await self.get(f"{base_url}?{query_string}")
+        else:
+            api_response_list = await self.get(f"{base_url}")
+
+        transformed_specializations: List[Dict[str, Union[int, str]]] = []
+        if isinstance(api_response_list, list):
+            for index, spec_name in enumerate(api_response_list):
+                if isinstance(spec_name, str): # Ensure the item from the list is a string
+                    transformed_specializations.append({"id": index, "name": spec_name})
+                else:
+                    # Log a warning or handle non-string items as needed
+                    logger.warning(f"Encountered non-string item in specializations list from API: {spec_name}")
+        return transformed_specializations
+    
+    async def close(self):
+        """
+        Closes the HTTP session.
+        """
+        await self.session.close()
+        logger.info("Backend API client session closed.")
