@@ -9,6 +9,8 @@ from llmservices.google_service import GoogleService
 from clients.backend_api_client import BackendApiClient
 from handlers.create_step_handler import CreateStepHandler
 from handlers.view_handler import ViewHandler
+from handlers.edit_handler import EditHandler
+from handlers.delete_handler import DeleteHandler
 
 # Configure logging
 db = db.Database()
@@ -28,7 +30,10 @@ class TelegramBotInitializer:
         """
         self.step_handler_instance = CreateStepHandler()
         self.view_handler_instance = ViewHandler()
-        self.conv_handler: ConversationHandler | None = None
+        self.edit_handler_instance = EditHandler()
+        self.delete_handler_instance = DeleteHandler()
+        self.conv_handler_create: ConversationHandler | None = None
+        self.conv_handler_edit: ConversationHandler | None = None
         self.bot = self.initialize_telegram_bot()
         
 
@@ -51,7 +56,7 @@ class TelegramBotInitializer:
             )
             
 
-            self.conv_handler = ConversationHandler(
+            self.conv_handler_create = ConversationHandler(
             entry_points=[CommandHandler("new_appointment", self.step_handler_instance.start_appointment_creation),
                           MessageHandler(filters.TEXT & ~filters.COMMAND, self.default_response)
                           ],
@@ -62,12 +67,30 @@ class TelegramBotInitializer:
                 CreateStepHandler.CHOOSE_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_date_choice)], # Обрабатывает дату и предлагает время
                 CreateStepHandler.CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_time_choice)],
                 CreateStepHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.step_handler_instance.process_confirmation)],
+                EditHandler.CHOOSE_APPOINTMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment)],
+                EditHandler.EDIT_APPOINTMENT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_date)],
+                EditHandler.EDIT_APPOINTMENT_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_time)],
+                EditHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.confirm_edit)],
+                DeleteHandler.CHOOSE_APPOINTMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.delete_handler_instance.choose_appointment)],
+                DeleteHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.delete_handler_instance.confirm_delete)],
             },
             fallbacks=[CommandHandler("cancel", self.step_handler_instance.cancel)],
 
         )
-            self.application.add_handler(self.conv_handler)
-            
+            self.conv_handler_edit = ConversationHandler(
+            entry_points=[CommandHandler("edit_appointment", self.edit_handler_instance.start_appointment_editing),
+                          MessageHandler(filters.TEXT & ~filters.COMMAND, self.default_response)
+                          ],
+            states={
+                EditHandler.CHOOSE_APPOINTMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment)],
+                EditHandler.EDIT_APPOINTMENT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_date)],
+                EditHandler.EDIT_APPOINTMENT_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_time)],
+                EditHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.confirm_edit)],
+            },
+            fallbacks=[CommandHandler("cancel", self.edit_handler_instance.cancel)],
+        )
+            self.application.add_handler(self.conv_handler_create)
+            #self.application.add_handler(self.conv_handler_edit)
             self.application.add_handler(CommandHandler("start", self.start_command))
             self.application.add_handler(CommandHandler("gettest", self.gettest_command))
             
@@ -138,12 +161,19 @@ class TelegramBotInitializer:
             )
             return
 
-        logger.info(f"handlers: {self.conv_handler.entry_points}")
+        logger.info(f"handlers: {self.conv_handler_create.entry_points}")
         if reply_msg.get("intent") == "book_appointment":
             return await self.step_handler_instance.start_appointment_creation(update, context)
 
         if reply_msg.get("intent") == "view_appointments":
             return await self.view_handler_instance.handle(update, context)
+        
+        if reply_msg.get("intent") == "reschedule_appointment":
+            return await self.edit_handler_instance.start_appointment_editing(update, context)
+        
+        if reply_msg.get("intent") == "cancel_appointment":
+            return await self.delete_handler_instance.start_appointment_deletion(update, context)
+
 
         await update.message.reply_text(
             f"Ваш запрос обработан. Ответ: {reply_msg}",
@@ -159,7 +189,7 @@ class TelegramBotInitializer:
             context (ContextTypes.DEFAULT_TYPE): The context of the command.
         """
 
-        logger.info(f"handlers: {self.conv_handler.entry_points}")
+        logger.info(f"handlers: {self.conv_handler_create.entry_points}")
         uuid = db.get_user_uuid(update.effective_user.id)
         await update.message.reply_text(
             f"Ваш UUID: <b>{uuid}</b>",

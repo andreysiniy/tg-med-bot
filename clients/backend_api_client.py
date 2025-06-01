@@ -29,7 +29,7 @@ class BackendApiClient:
         async with self.session.post(url, json=data) as response:
             response.raise_for_status()
             logger.info(f"POST {url} with data {data} returned status {response.status}")
-            #await self.close()
+            await self.close()
             return await response.json()
     
     async def get(self, endpoint: str, params: dict = None) -> dict:
@@ -47,8 +47,53 @@ class BackendApiClient:
         async with self.session.get(url, params=params) as response:
             response.raise_for_status()
             logger.info(f"GET {url} with params {params} returned status {response.status}")
-            #await self.close()
+            await self.close()
             return await response.json()
+        
+    async def put(self, endpoint: str, data: dict) -> dict:
+        """
+        Sends a PUT request to the specified endpoint with the provided data.
+
+        Args:
+            endpoint (str): The API endpoint to send the request to.
+            data (dict): The data to include in the PUT request.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        url = f"{self.base_url}{endpoint}"
+        header = {
+            "Content-Type": "application/json"
+        }
+        async with self.session.put(url, json=data, headers=header) as response:
+
+            response.raise_for_status()
+            logger.info(f"PUT {url} with data {data} returned status {response.status}")
+            await self.close()
+            if response.status == 204:  # No Content
+                return response.ok
+            else:
+                return await response.json()
+    
+    async def delete(self, endpoint: str) -> dict:
+        """
+        Sends a DELETE request to the specified endpoint.
+
+        Args:
+            endpoint (str): The API endpoint to send the request to.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        url = f"{self.base_url}{endpoint}"
+        async with self.session.delete(url) as response:
+            response.raise_for_status()
+            logger.info(f"DELETE {url} returned status {response.status}")
+            await self.close()
+            if response.status == 204:  # No Content
+                return response.ok
+            else:
+                return await response.json()
     
     async def get_clinic_card(self, clinic_id: int) -> dict:
         """
@@ -171,6 +216,31 @@ class BackendApiClient:
             dict: The JSON response containing the created appointment details.
         """
         return await self.post("Appointment", data)
+    
+    async def put_appointment(self, appointment_id: int, data: dict) -> dict:
+        """
+        Updates an existing appointment with the provided data.
+
+        Args:
+            appointment_id (int): The ID of the appointment to update.
+            data (dict): The data to update the appointment with.
+
+        Returns:
+            dict: The JSON response containing the updated appointment details.
+        """
+        return await self.put(f"Appointment/{appointment_id}", data)
+    
+    async def delete_appointment(self, appointment_id: int, uuid: str) -> dict:
+        """
+        Deletes an appointment by its ID.
+
+        Args:
+            appointment_id (int): The ID of the appointment to delete.
+
+        Returns:
+            dict: The JSON response confirming the deletion of the appointment.
+        """
+        return await self.delete(f"Appointment/{appointment_id}")
     
     async def get_specific_doctors(
         self,

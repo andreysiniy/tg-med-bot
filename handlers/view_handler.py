@@ -17,8 +17,6 @@ class ViewHandler:
     It also handles the case where the user has no appointments.
     """
 
-    def __init__(self):
-        self.backend_api_client = BackendApiClient()
 
     async def handle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
@@ -29,16 +27,17 @@ class ViewHandler:
             return
 
         try:
-            appointments = await self.backend_api_client.get_appointments_by_user_uuid(user_uuid)
+            appointments = await BackendApiClient().get_appointments_by_user_uuid(user_uuid)
             temp_id = 1
+            response_text = "Ваши записи на прием:\n\n"
             for appointment in appointments:
-                doctor_card = await self.backend_api_client.get_doctor_card(appointment.get("doctorId"))
-                clinic_card = await self.backend_api_client.get_clinic_card(doctor_card.get("clinicId"))
+                doctor_card = await BackendApiClient().get_doctor_card(appointment.get("doctorId"))
+                clinic_card = await BackendApiClient().get_clinic_card(doctor_card.get("clinicId"))
                 appointment_time_str = appointment.get("appointmentTime")
                 dt_object = datetime.fromisoformat(appointment_time_str)
                 formatted_time = dt_object.strftime("%d.%m %H:%M")
-                response_text = (
-                    f"Запись на прием #{temp_id}:\n"
+                response_text += (
+                    f"Запись на прием <b>#{temp_id}:</b>\n"
                     f"Врач: <b>{doctor_card.get('name')}</b>\n"
                     f"Номер телефона: <b>{doctor_card.get('phoneNumber')}</b>\n"
                     f"Специализация: <b>{doctor_card.get('speciality')}</b>\n"
@@ -49,7 +48,7 @@ class ViewHandler:
                     f"\n"
                 )
                 temp_id += 1
-                await update.message.reply_text(response_text, parse_mode='HTML')
+            await update.message.reply_text(response_text, parse_mode='HTML')
             if not appointments:
                 await update.message.reply_text("У вас нет записей на прием.")
         except Exception as e:
