@@ -377,7 +377,7 @@ class CreateStepHandler:
             user_data.pop("chosen_date_str", None) # Больше не нужно
             return await self.prompt_confirmation(update, context)
         else:
-            # Этого не должно случиться (надеюсь), но на всякий случай, если что-то пошло не так, а то вдруг дата невалидная, ну такое бывает
+            # Этого не должно случиться (надеюсь), но на всякий случай, если что-то пошло не так, а то вдруг дата невалидная, ну такое бывает, не?
             await update.effective_message.reply_text("Произошла ошибка. Попробуйте снова.")
             return await self.prompt_date(update, context)
 
@@ -390,7 +390,7 @@ class CreateStepHandler:
             try:
                 dt_readable = datetime.fromisoformat(dt_iso).strftime('%d.%m.%Y в %H:%M')
             except ValueError:
-                pass # останется "не определено"
+                pass 
 
         text = (
             "Подтвердите запись:\n"
@@ -414,6 +414,7 @@ class CreateStepHandler:
                 "appointmentTime" : context.user_data["create_appointment_data"]["appointment_datetime_iso"],
                 "doctorId" : context.user_data["create_appointment_data"]["doctor_id"]
             }
+            logger.info(f"Creating appointment with data: {request_body}")
             response = await BackendApiClient().post_appointment(request_body)
             if response:
                 await update.effective_message.reply_text("Вы успешно записаны!", reply_markup=ReplyKeyboardRemove())
