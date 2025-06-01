@@ -105,7 +105,10 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the clinic cards.
         """
-        return await self.get(f"ClinicCards/{clinic_id}")
+        clinic = await self.get(f"ClinicCards/{clinic_id}")
+        clinic['name'] = clinic['name'].title()
+        clinic['location'] = clinic['location'].title()
+        return clinic
     
     async def get_clinic_cards(self) -> dict:
         """
@@ -114,7 +117,11 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the clinic cards.
         """
-        return await self.get(f"ClinicCards/")
+        clinics = await self.get(f"ClinicCards/")
+        for clinic in clinics:
+            clinic['name'] = clinic['name'].title()
+            clinic['location'] = clinic['location'].title()
+        return clinics
     
     async def get_doctor_cards(self) -> dict:
         """
@@ -123,7 +130,11 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the doctor cards.
         """
-        return await self.get(f"DoctorCards/")
+        doctors = await self.get(f"DoctorCards/")
+        for doctor in doctors:
+            doctor['name'] = doctor['name'].title()
+            doctor['speciality'] = doctor['speciality'].title()
+        return doctors
     
     async def get_doctor_card(self, doctor_id: int) -> dict:
         """
@@ -135,7 +146,10 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the doctor card.
         """
-        return await self.get(f"DoctorCards/{doctor_id}")
+        doctor = await self.get(f"DoctorCards/{doctor_id}")
+        doctor['name'] = doctor['name'].title()
+        doctor['speciality'] = doctor['speciality'].title()
+        return doctor
     
     async def get_doctor_working_hours(self, doctor_id: int, date: datetime) -> dict:
         """
@@ -167,7 +181,7 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the doctor cards that match the name.
         """
-        return await self.get(f"DoctorCards/name/{name}")
+        return await self.get(f"DoctorCards/name/{name.lower()}")
     
     async def get_doctor_containting_specialization(self, specialization: str) -> dict:
         """
@@ -179,7 +193,7 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the doctor cards that match the specialization.
         """
-        return await self.get(f"DoctorCards/speciality/{specialization}")
+        return await self.get(f"DoctorCards/speciality/{specialization.lower()}")
     
     async def get_appointment(self, appointment_id: int) -> dict:
         """
@@ -267,16 +281,20 @@ class BackendApiClient:
         if clinic_id:
             query_params["clinicId"] = clinic_id
         if specialization:
-            query_params["speciality"] = specialization
+            query_params["speciality"] = specialization.lower()
         if name:
-            query_params["name"] = name
+            query_params["name"] = name.lower()
         if date:
             query_params["appointmentDate"] = datetime.strptime(date, '%Y-%m-%dT%H:%M')
         query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
         if query_string:
-            return await self.get(f"{base_url}?{query_string}")
+            doctor_list = await self.get(f"{base_url}?{query_string}")
         else:
-            return await self.get(base_url)
+            doctor_list = await self.get(f"{base_url}")
+        for doctor in doctor_list:
+            doctor['name'] = doctor['name'].title()
+            doctor['speciality'] = doctor['speciality'].title() 
+        return doctor_list
        
     async def get_clinic_by_name(self, name: str) -> dict:
         """
@@ -286,7 +304,11 @@ class BackendApiClient:
         Returns:
             dict: The JSON response containing the clinic details.
         """
-        return await self.get(f"ClinicCards/name/{name}")
+        clinics = await self.get(f"ClinicCards/name/{name.lower()}")
+        for clinic in clinics:
+            clinic['name'] = clinic['name'].title()
+            clinic['location'] = clinic['location'].title()
+        return clinics
     
     async def get_specializations(
         self,
@@ -312,9 +334,9 @@ class BackendApiClient:
         if clinic_id:
             query_params["clinicId"] = clinic_id
         if specialization:
-            query_params["speciality"] = specialization
+            query_params["speciality"] = specialization.lower()
         if name:
-            query_params["name"] = name
+            query_params["name"] = name.lower()
         if date:
             query_params["appointmentDate"] = datetime.strptime(date, '%Y-%m-%dT%H:%M')
         query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
@@ -325,11 +347,13 @@ class BackendApiClient:
         else:
             api_response_list = await self.get(f"{base_url}")
 
+        
+
         transformed_specializations: List[Dict[str, Union[int, str]]] = []
         if isinstance(api_response_list, list):
             for index, spec_name in enumerate(api_response_list):
                 if isinstance(spec_name, str): # Ensure the item from the list is a string
-                    transformed_specializations.append({"id": index, "name": spec_name})
+                    transformed_specializations.append({"id": index, "name": spec_name.title()})
                 else:
                     # Log a warning or handle non-string items as needed
                     logger.warning(f"Encountered non-string item in specializations list from API: {spec_name}")

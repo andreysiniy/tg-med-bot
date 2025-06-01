@@ -86,11 +86,11 @@ class DeleteHandler:
                 formatted_time = dt_object.strftime("%d.%m %H:%M")
                 response_text += (
                     f"Запись на прием <b>#{temp_id}:</b>\n"
-                    f"Врач: <b>{doctor_card.get('name')}</b>\n"
+                    f"Врач: <b>{doctor_card.get('name').title()}</b>\n"
                     f"Номер телефона: <b>{doctor_card.get('phoneNumber')}</b>\n"
-                    f"Специализация: <b>{doctor_card.get('speciality')}</b>\n"
-                    f"Клиника: <b>{clinic_card.get('name')}</b>\n"
-                    f"Адрес: <b>{clinic_card.get('location')}</b>\n"
+                    f"Специализация: <b>{doctor_card.get('speciality').title()}</b>\n"
+                    f"Клиника: <b>{clinic_card.get('name').title()}</b>\n"
+                    f"Адрес: <b>{clinic_card.get('location').title()}</b>\n"
                     f"Телефон клиники: <b>{clinic_card.get('phone')}</b>\n"
                     f"Дата и время приема: <b>{formatted_time}</b>\n"
                     f"\n"
@@ -162,9 +162,9 @@ class DeleteHandler:
         dt_object = datetime.strftime(datetime.fromisoformat(appointment_time_str), "%d.%m в %H:%M")
 
         confirmation_text = (
-            f"Вы уверены, что хотите изменить запись на прием?\n\n"
-            f"Врач: <b>{doctor_card.get('name')}</b>\n"
-            f"Клиника: <b>{clinic_card.get('name')}</b>\n"
+            f"Вы уверены, что хотите удалить запись на прием?\n\n"
+            f"Врач: <b>{doctor_card.get('name').title()}</b>\n"
+            f"Клиника: <b>{clinic_card.get('name').title()}</b>\n"
             f"Дата и время: <b>{dt_object}</b>\n"
         )
         

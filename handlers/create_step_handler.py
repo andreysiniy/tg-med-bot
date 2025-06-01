@@ -77,7 +77,11 @@ class CreateStepHandler:
         Returns:
             int: The next state in the conversation flow, CHOOSE_CLINIC.
         """
-        clinics = await BackendApiClient().get_clinic_cards()
+        prefilled_clinic = context.user_data["prefilled_info"].get("clinic", None)
+        if prefilled_clinic:
+            clinics = await BackendApiClient().get_clinic_by_name(name=prefilled_clinic)
+        else:
+            clinics = await BackendApiClient().get_clinic_cards()
         if not clinics:
             await update.effective_message.reply_text("Извините, в данный момент нет доступных клиник.")
             return ConversationHandler.END
@@ -285,8 +289,9 @@ class CreateStepHandler:
         prefilled_date = context.user_data["prefilled_info"].get("date", None)
         opts = []
         prefilled_date_obj = datetime.strptime(prefilled_date, "%Y-%m-%d").date() if prefilled_date else None
-        if prefilled_date_obj > date.today() + timedelta(days=14) or prefilled_date_obj < date.today():
-            prefilled_date_obj = None
+        if prefilled_date_obj:    
+            if prefilled_date_obj > date.today() + timedelta(days=14) or prefilled_date_obj < date.today():
+                prefilled_date_obj = None
         start_date_val = date.today()
         dates_next_two_weeks = []
         for i in range(14):
@@ -458,9 +463,9 @@ class CreateStepHandler:
                 text = (
                     "Данные записи:\n"
                     f"Пациент: <b>{response['patientName']}</b>\n"
-                    f"Клиника: <b>{response['clinicName']}</b>\n"
-                    f"Специальность: <b>{response['doctorSpeciality']}</b>\n"
-                    f"Врач: <b>{response['doctorName']}</b>\n"
+                    f"Клиника: <b>{response['clinicName'].title()}</b>\n"
+                    f"Специальность: <b>{response['doctorSpeciality'].title()}</b>\n"
+                    f"Врач: <b>{response['doctorName'].title()}</b>\n"
                     f"Дата и время: <b>{formatted_time}</b>"
                 )
                 await update.effective_message.reply_text(text, parse_mode='HTML')

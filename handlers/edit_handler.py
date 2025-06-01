@@ -85,11 +85,11 @@ class EditHandler:
                 formatted_time = dt_object.strftime("%d.%m %H:%M")
                 response_text += (
                     f"Запись на прием <b>#{temp_id}:</b>\n"
-                    f"Врач: <b>{doctor_card.get('name')}</b>\n"
+                    f"Врач: <b>{doctor_card.get('name').title()}</b>\n"
                     f"Номер телефона: <b>{doctor_card.get('phoneNumber')}</b>\n"
-                    f"Специализация: <b>{doctor_card.get('speciality')}</b>\n"
-                    f"Клиника: <b>{clinic_card.get('name')}</b>\n"
-                    f"Адрес: <b>{clinic_card.get('location')}</b>\n"
+                    f"Специализация: <b>{doctor_card.get('speciality').title()}</b>\n"
+                    f"Клиника: <b>{clinic_card.get('name').title()}</b>\n"
+                    f"Адрес: <b>{clinic_card.get('location').title()}</b>\n"
                     f"Телефон клиники: <b>{clinic_card.get('phone')}</b>\n"
                     f"Дата и время приема: <b>{formatted_time}</b>\n"
                     f"\n"
@@ -234,12 +234,14 @@ class EditHandler:
         new_time = context.user_data['edit_appointment_data'].get('new_time')
         doctor_card = await BackendApiClient().get_doctor_card(selected_appointment.get("doctorId"))
         clinic_card = await BackendApiClient().get_clinic_card(doctor_card.get("clinicId"))
+        appointment_time_str = selected_appointment.get("appointmentTime")
+        dt_object = datetime.strftime(datetime.fromisoformat(appointment_time_str), "%d.%m в %H:%M")
 
         confirmation_text = (
             f"Вы уверены, что хотите изменить запись на прием?\n\n"
-            f"Врач: <b>{doctor_card.get('name')}</b>\n"
-            f"Клиника: <b>{clinic_card.get('name')}</b>\n"
-            f"Старая дата и время: <b>{selected_appointment.get('appointmentTime')}</b>\n"
+            f"Врач: <b>{doctor_card.get('name').title()}</b>\n"
+            f"Клиника: <b>{clinic_card.get('name').title()}</b>\n"
+            f"Старая дата и время: <b>{dt_object}</b>\n"
             f"Новая дата: <b>{new_date}</b>\n"
             f"Новое время: <b>{new_time}</b>\n"
         )
