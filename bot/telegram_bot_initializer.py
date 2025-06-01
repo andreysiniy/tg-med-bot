@@ -33,7 +33,6 @@ class TelegramBotInitializer:
         self.edit_handler_instance = EditHandler()
         self.delete_handler_instance = DeleteHandler()
         self.conv_handler_create: ConversationHandler | None = None
-        self.conv_handler_edit: ConversationHandler | None = None
         self.bot = self.initialize_telegram_bot()
         
 
@@ -77,20 +76,8 @@ class TelegramBotInitializer:
             fallbacks=[CommandHandler("cancel", self.step_handler_instance.cancel)],
 
         )
-            self.conv_handler_edit = ConversationHandler(
-            entry_points=[CommandHandler("edit_appointment", self.edit_handler_instance.start_appointment_editing),
-                          MessageHandler(filters.TEXT & ~filters.COMMAND, self.default_response)
-                          ],
-            states={
-                EditHandler.CHOOSE_APPOINTMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment)],
-                EditHandler.EDIT_APPOINTMENT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_date)],
-                EditHandler.EDIT_APPOINTMENT_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.choose_appointment_time)],
-                EditHandler.CONFIRMATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.edit_handler_instance.confirm_edit)],
-            },
-            fallbacks=[CommandHandler("cancel", self.edit_handler_instance.cancel)],
-        )
+
             self.application.add_handler(self.conv_handler_create)
-            #self.application.add_handler(self.conv_handler_edit)
             self.application.add_handler(CommandHandler("start", self.start_command))
             self.application.add_handler(CommandHandler("gettest", self.gettest_command))
             
@@ -160,10 +147,11 @@ class TelegramBotInitializer:
                 f"Не могу понять ваш запрос: {reply_msg.get('reason', 'Неизвестная ошибка')} Пожалуйста, попробуйте переформулировать."
             )
             return
+        prefilled_data_from_llm = reply_msg.get("data", {})
 
         logger.info(f"handlers: {self.conv_handler_create.entry_points}")
         if reply_msg.get("intent") == "book_appointment":
-            return await self.step_handler_instance.start_appointment_creation(update, context)
+            return await self.step_handler_instance.start_appointment_creation(update, context, prefilled_data=prefilled_data_from_llm)
 
         if reply_msg.get("intent") == "view_appointments":
             return await self.view_handler_instance.handle(update, context)

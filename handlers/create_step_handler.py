@@ -3,6 +3,7 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardR
 from telegram.ext import ContextTypes, ConversationHandler
 from clients.backend_api_client import BackendApiClient
 from datetime import date, timedelta, datetime
+from typing import Optional
 import db.mongodb_service as db
 import logging
 
@@ -49,7 +50,7 @@ class CreateStepHandler:
             resize_keyboard=True
         )
 
-    async def start_appointment_creation(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    async def start_appointment_creation(self, update: Update, context: ContextTypes.DEFAULT_TYPE, prefilled_data: Optional[dict] = None) -> int:
         """
         Starts the appointment creation process by prompting the user to select a clinic.
         
@@ -61,6 +62,7 @@ class CreateStepHandler:
         """
         context.user_data.clear()
         context.user_data.setdefault("create_appointment_data", {})
+        context.user_data["prefilled_info"] = prefilled_data or {} 
         return await self.prompt_clinic(update, context)
 
     # ---- Step 1: Clinic Selection ----
@@ -135,8 +137,18 @@ class CreateStepHandler:
             int: The next state in the conversation flow, CHOOSE_SPECIALIZATION.
         """
         clinic_id = context.user_data["create_appointment_data"].get("clinic_id")
+        prefilled_spec = context.user_data["prefilled_info"].get("specialization", None)
+        prefilled_doc = context.user_data["prefilled_info"].get("doctor", None)
+        prefilled_date = context.user_data["prefilled_info"].get("date", None)
+        prefilled_time = context.user_data["prefilled_info"].get("time", None)
+        if prefilled_date and prefilled_time:
+            prefilled_datetime = f"{prefilled_date}T{prefilled_time}"
+        else:
+            prefilled_datetime = None
 
-        specializations = await BackendApiClient().get_specializations(clinic_id=clinic_id)
+
+        specializations = await BackendApiClient().get_specializations(clinic_id=clinic_id, 
+                specialization=prefilled_spec, name=prefilled_doc, date=prefilled_datetime)
         if not specializations:
             await update.effective_message.reply_text("Нет доступных специализаций.")
             return await self.prompt_clinic(update, context)
@@ -195,10 +207,19 @@ class CreateStepHandler:
         Returns:
             int: The next state in the conversation flow, CHOOSE_DOCTOR.
         """
+        prefilled_doc = context.user_data["prefilled_info"].get("doctor", None)
+        prefilled_date = context.user_data["prefilled_info"].get("date", None)
+        prefilled_time = context.user_data["prefilled_info"].get("time", None)
+        if prefilled_date and prefilled_time:
+            prefilled_datetime = f"{prefilled_date}T{prefilled_time}"
+        else:
+            prefilled_datetime = None
         appointment_data = context.user_data["create_appointment_data"]
         doctors = await BackendApiClient().get_specific_doctors(
             specialization=appointment_data.get("specialization_name"),
-            clinic_id=appointment_data.get("clinic_id")
+            clinic_id=appointment_data.get("clinic_id"),
+            name=prefilled_doc,
+            date=prefilled_datetime
         )
         if not doctors:
             await update.effective_message.reply_text(
@@ -261,13 +282,21 @@ class CreateStepHandler:
         Returns:
             int: The next state in the conversation flow, CHOOSE_DATE.
         """
+        prefilled_date = context.user_data["prefilled_info"].get("date", None)
+        opts = []
+        prefilled_date_obj = datetime.strptime(prefilled_date, "%Y-%m-%d").date() if prefilled_date else None
+        if prefilled_date_obj > date.today() + timedelta(days=14) or prefilled_date_obj < date.today():
+            prefilled_date_obj = None
         start_date_val = date.today()
         dates_next_two_weeks = []
         for i in range(14):
             next_date = start_date_val + timedelta(days=i)
             dates_next_two_weeks.append(next_date.strftime("%Y-%m-%d"))
-        
-        keyboard = await self._create_keyboard(dates_next_two_weeks, items_per_row=3, back_button_text="Назад (к врачу)")
+        if prefilled_date_obj:
+            opts.append(prefilled_date_obj.strftime("%Y-%m-%d"))
+            keyboard = await self._create_keyboard(options=opts, items_per_row=1, back_button_text="Назад (к врачу)")
+        else:
+            keyboard = await self._create_keyboard(dates_next_two_weeks, items_per_row=3, back_button_text="Назад (к врачу)")
         await update.effective_message.reply_text("Выберите дату приема:", reply_markup=keyboard)
         return self.CHOOSE_DATE
 
@@ -299,6 +328,9 @@ class CreateStepHandler:
 
         appointment_data["chosen_date_str"] = chosen_date_str
         
+        prefilled_time = context.user_data["prefilled_info"].get("time", None)
+
+
         # Запрашиваем время для выбранной даты
         times = await BackendApiClient().get_doctor_working_hours(
             doctor_id=appointment_data.get("doctor_id"),
@@ -313,6 +345,8 @@ class CreateStepHandler:
             return await self.prompt_date(update, context) 
 
         context.user_data["_temp_available_times"] = times
+        if prefilled_time and prefilled_time in times:
+            times = [prefilled_time]
         keyboard = await self._create_keyboard(times, items_per_row=3, back_button_text="Назад (к дате)")
         await update.effective_message.reply_text("Выберите время приема:", reply_markup=keyboard)
         return self.CHOOSE_TIME
@@ -377,7 +411,7 @@ class CreateStepHandler:
             user_data.pop("chosen_date_str", None) # Больше не нужно
             return await self.prompt_confirmation(update, context)
         else:
-            # Этого не должно случиться (надеюсь), но на всякий случай, если что-то пошло не так, а то вдруг дата невалидная, ну такое бывает, не?
+            # Этого не должно случиться (надеюсь), но на всякий случай, если что-то пошло не так, а то вдруг дата невалидная, ну такое бывает, не? вроде как, но я не знаю
             await update.effective_message.reply_text("Произошла ошибка. Попробуйте снова.")
             return await self.prompt_date(update, context)
 

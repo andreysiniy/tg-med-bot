@@ -1,5 +1,5 @@
 from aiohttp import ClientSession
-import datetime
+from datetime import datetime
 from typing import Optional
 from typing import List, Dict, Union
 import logging
@@ -271,7 +271,7 @@ class BackendApiClient:
         if name:
             query_params["name"] = name
         if date:
-            query_params["appointmentDate"] = date.strftime('%Y-%m-%dT%H:%M')
+            query_params["appointmentDate"] = datetime.strptime(date, '%Y-%m-%dT%H:%M')
         query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
         if query_string:
             return await self.get(f"{base_url}?{query_string}")
@@ -316,7 +316,7 @@ class BackendApiClient:
         if name:
             query_params["name"] = name
         if date:
-            query_params["appointmentDate"] = date.strftime('%Y-%m-%dT%H:%M')
+            query_params["appointmentDate"] = datetime.strptime(date, '%Y-%m-%dT%H:%M')
         query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
         
         
