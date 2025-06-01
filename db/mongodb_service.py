@@ -72,5 +72,8 @@ class Database:
         """
         user_firstname = self.user_collection.find_one({"user_id": user_id}, {"first_name": 1})
         user_lastname = self.user_collection.find_one({"user_id": user_id}, {"last_name": 1})
-        user = user_firstname.get("first_name", "") +  ' ' + user_lastname.get("last_name", "")
+        if user_lastname != "":
+            user = user_firstname.get("first_name", "") +  ' ' + user_lastname.get("last_name", "")
+        else:
+            user = user_firstname.get("first_name", "")
         return user if user else None
