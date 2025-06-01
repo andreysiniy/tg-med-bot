@@ -8,6 +8,7 @@ from helpers.configurator import Config
 from llmservices.google_service import GoogleService
 from clients.backend_api_client import BackendApiClient
 from handlers.create_step_handler import CreateStepHandler
+from handlers.view_handler import ViewHandler
 
 # Configure logging
 db = db.Database()
@@ -26,6 +27,7 @@ class TelegramBotInitializer:
             token (str): The bot token provided by BotFather.
         """
         self.step_handler_instance = CreateStepHandler()
+        self.view_handler_instance = ViewHandler()
         self.conv_handler: ConversationHandler | None = None
         self.bot = self.initialize_telegram_bot()
         
@@ -140,6 +142,8 @@ class TelegramBotInitializer:
         if reply_msg.get("intent") == "book_appointment":
             return await self.step_handler_instance.start_appointment_creation(update, context)
 
+        if reply_msg.get("intent") == "view_appointments":
+            return await self.view_handler_instance.handle(update, context)
 
         await update.message.reply_text(
             f"Ваш запрос обработан. Ответ: {reply_msg}",

@@ -28,6 +28,8 @@ class BackendApiClient:
         url = f"{self.base_url}{endpoint}"
         async with self.session.post(url, json=data) as response:
             response.raise_for_status()
+            logger.info(f"POST {url} with data {data} returned status {response.status}")
+            #await self.close()
             return await response.json()
     
     async def get(self, endpoint: str, params: dict = None) -> dict:
@@ -44,6 +46,8 @@ class BackendApiClient:
         url = f"{self.base_url}{endpoint}"
         async with self.session.get(url, params=params) as response:
             response.raise_for_status()
+            logger.info(f"GET {url} with params {params} returned status {response.status}")
+            #await self.close()
             return await response.json()
     
     async def get_clinic_card(self, clinic_id: int) -> dict:
@@ -260,6 +264,18 @@ class BackendApiClient:
                     # Log a warning or handle non-string items as needed
                     logger.warning(f"Encountered non-string item in specializations list from API: {spec_name}")
         return transformed_specializations
+    
+    async def get_appointments_by_user_uuid(self, user_uuid: str) -> List[dict]:
+        """
+        Retrieves appointments by user UUID.
+
+        Args:
+            user_uuid (str): The UUID of the user to retrieve appointments for.
+
+        Returns:
+            List[dict]: A list of JSON responses containing the user's appointments.
+        """
+        return await self.get(f"Appointment/user/{user_uuid}")
     
     async def close(self):
         """
